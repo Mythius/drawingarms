@@ -1,0 +1,234 @@
+<html>
+
+<head>
+    <link rel="icon" type="image/x-icon" href="icon.png">
+    <script src=helpers.js></script>
+    <script src=sprite.js></script>
+    <script src=input.js></script>
+    <style type="text/css">
+        canvas {
+            border: 1px solid black;
+        }
+        input[type=range]{
+            display: block;
+        }
+        main{
+            display: flex;
+        }
+        main>div{
+            padding-left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <canvas width=700 height=700></canvas>
+        <div>
+            <br>
+            Animate: <input id=animate type="checkbox"><br>
+            Draw: <input id=draw type="checkbox"><br>
+            Circles: <input id=circles type="checkbox"><br>
+            <button id=clear>Clear Path</button><br>
+            Red Circle 1:<input type="range" id="R2">
+            Red Circle 2:<input type="range" id="R1">
+            Green Lower 1:<input max=400 min=200 type="range" id="GL1">
+            Green Lower 2:<input max=400 min=200 type="range" id="GL2">
+            Green Upper 1:<input min=50 max=150 type="range" id="GU1">
+            Green Upper 2:<input min=50 max=150 type="range" id="GU2">
+            Orange 1:<input min=50 max=150 type="range" id="O1">
+            Orange 2:<input min=50 max=150 type="range" id="O2">
+            Start Angle 1:<input min=0 max=359 type="range" id="SP1">
+            Start Angle 2:<input min=0 max=359 type="range" id="SP2">
+            Rotation speed 1:<input step=.3 min=-180 max=180 type="range" id="V1">
+            Rotation speed 2:<input step=.3 min=-180 max=180 type="range" id="V2">
+        </div>
+    </main>
+    <script>
+    var Q1 = 60; // RED CIRCLE
+    var R1 = 250; // GREEN ARM Lower Half
+    var S1 = 150; // ORANGE ARM
+    var T1 = 150; // GREEN ARM Upper Half
+    var Q2 = 60;
+    var R2 = 250;
+    var S2 = 150;
+    var T2 = 150;
+    var speed1 = 5.1; // rotation speed 1
+    var speed2 = 4;
+    let a1 = 270; // start angle 1
+    let a2 = 1; 
+
+    let p1 = new Vector(500, 600);
+    let p2 = new Vector(200, 600);
+
+    let pen_down = false;
+    let circles = false;
+
+
+    const canvas = obj('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function drawPoint(vector, color = 'red', r = 5) {
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(vector.x, vector.y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function drawLine(v1,v2,color='green',lw=1){
+    	ctx.beginPath();
+    	ctx.strokeStyle = color;
+    	ctx.lineWidth = lw;
+    	ctx.moveTo(v1.x,v1.y);
+    	ctx.lineTo(v2.x,v2.y);
+    	ctx.stroke();
+    }
+
+    let path = [];
+
+    function draw() {
+        setTimeout(draw, 1000 / 30);
+
+        ctx.clearRect(-2, -2, canvas.width + 2, canvas.height + 2);
+        readSliders();
+
+        drawPoint(p1);
+        drawPoint(p2);
+
+        drawCircleAround(p1,Q1,'red');
+        drawCircleAround(p2,Q2,'red');
+
+
+        let r1 = Vector.getPointIn(Vector.rad(a1), Q1, p1.x, p1.y);
+        let r2 = Vector.getPointIn(Vector.rad(a2), Q2, p2.x, p2.y);
+
+        drawPoint(r1, 'blue');
+        if(circles) drawCircleAround(r1, R1);
+        drawPoint(r2, 'blue');
+        if(circles) drawCircleAround(r2, R2);
+
+
+        let ipoints1 = findCircleIntersections({x:r1.x,y:r1.y,radius:R1},{x:r2.x,y:r2.y,radius:R2});
+
+        let i1 = ipoints1[0].y < 600 ? ipoints1[0] : ipoints1[1];
+
+        drawPoint(i1,'green');
+
+        let aj1 = Vector.getPointIn(Vector.rad(Vector.getDir(r1.x-i1.x,r1.y-i1.y)),+R1+T1,r1.x,r1.y);
+        let aj2 = Vector.getPointIn(Vector.rad(Vector.getDir(r2.x-i1.x,r2.y-i1.y)),+R2+T2,r2.x,r2.y);
+
+        drawPoint(aj1,'cyan');
+        drawPoint(aj2,'cyan');
+        drawLine(r1,aj1);
+        drawLine(r2,aj2);
+
+        if(circles) drawCircleAround(aj1,S1,'cyan');
+        if(circles) drawCircleAround(aj2,S2,'cyan');
+
+        let ipoints2 = findCircleIntersections({x:aj1.x,y:aj1.y,radius:S1},{x:aj2.x,y:aj2.y,radius:S2})
+        let i2 = ipoints2[0].y < aj1.y ? ipoints2[0] : ipoints2[1];
+
+        drawPoint(i2,'green');
+
+        drawLine(aj1,i2,'orange');
+        drawLine(aj2,i2,'orange');
+
+        if(pen_down) path.push(i2);
+
+        drawPath(path,'black');
+
+        a1 += speed1;
+        a2 += speed2;
+
+    }
+
+    function drawPath(path,color){
+    	if(path.length == 0) return;
+    	ctx.lineWidth = 1;
+    	ctx.strokeStyle = color;
+    	ctx.beginPath();
+    	ctx.moveTo(path[0].x,path[0].y);
+    	for(let i=1;i<path.length;i++){
+    		ctx.lineTo(path[i].x,path[i].y);
+    	}
+    	ctx.stroke();
+    }
+
+
+    function drawCircleAround(vector, r, color = 'blue') {
+        ctx.beginPath();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = color;
+        ctx.arc(vector.x, vector.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    function findCircleIntersections(circle1, circle2) {
+        // Destructuring circle parameters
+        const { x: x1, y: y1, radius: r1 } = circle1;
+        const { x: x2, y: y2, radius: r2 } = circle2;
+
+        // Calculate distance between the centers of the circles
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Check if circles are separate or coincident
+        if (distance > r1 + r2 || distance < Math.abs(r1 - r2)) {
+            return "No intersection points - circles are separate or contained within each other.";
+        }
+
+        // Calculate intersection points
+        const a = (r1 * r1 - r2 * r2 + distance * distance) / (2 * distance);
+        const h = Math.sqrt(r1 * r1 - a * a);
+        const xIntersection1 = x1 + (dx * a) / distance + (dy * h) / distance;
+        const yIntersection1 = y1 + (dy * a) / distance - (dx * h) / distance;
+        const xIntersection2 = x1 + (dx * a) / distance - (dy * h) / distance;
+        const yIntersection2 = y1 + (dy * a) / distance + (dx * h) / distance;
+
+        // Return intersection points
+        return [
+            { x: xIntersection1, y: yIntersection1 },
+            { x: xIntersection2, y: yIntersection2 },
+        ];
+    }
+
+    function readSliders(){
+        let animate = obj('#animate').checked;
+        Q1 = +obj('#R1').value;
+        Q2 = +obj('#R2').value;
+        R1 = +obj('#GL2').value;
+        S1 = +obj('#O2').value;
+        T1 = +obj('#GU2').value;
+        R2 = +obj('#GL1').value;
+        S2 = +obj('#O1').value;
+        T2 = +obj('#GU1').value;
+        speed1 = +obj('#V2').value;
+        speed2 = +obj('#V1').value;
+        pen_down = obj('#draw').checked;
+        circles = obj('#circles').checked;
+        if(!animate){
+            a1 = +obj('#SP2').value;
+            a2 = +obj('#SP1').value;
+        }
+        obj('#clear').on('click',e=>{
+            path = [];
+        });
+    }
+
+    let sliders = [...document.querySelectorAll('input[type=range]')];
+
+    for(let s of sliders){
+        s.on('contextmenu',e=>{
+            e.preventDefault();
+            s.value = +prompt('Enter Value:');
+        });
+    }
+
+
+
+    draw();
+    </script>
+</body>
+
+</html>
